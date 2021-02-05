@@ -2,7 +2,7 @@
 
 clearvars;clc;
 
-test_offline_file = 'ah7.20170613.162934.offline.mi.mi_bhbf.gdf.mat';
+test_offline_file = 'ai6.20180316.153104.offline.mi.mi_bhbf.gdf';
 %mnemonic codes
 code.fixation = 786;
 code.cue_BH = 773;
@@ -12,21 +12,22 @@ code.feedback = 781;
 mode.offline = 0;
 mode.online = 1;
 num_classes = 2;
-data_path = './data/';
+data_path = './data/ai6_micontinuous/';
 %sub-band of frequencies of psd we are interested in
 selected_frequences = (4:2:48)';
 num_features = 5;
 features_filter = load('features_filter.mat').features_filter';
 
 %Load OFFLINE file
-load(strcat(data_path, test_offline_file));
+%load(strcat(data_path, test_offline_file));
 %the file shoud contain a struct named "data" containing a signal and its
 %header (data.s and data.h)
 
 %% EEG to PSD
 
-signal = data.s;
-header = data.h;
+%signal = data.s;
+%header = data.h;
+[signal, header] = sload(strcat(data_path, test_offline_file));
 
 psd_signal = psd_extraction(signal, header);
 
@@ -56,21 +57,17 @@ for k = 1 : length(selected_freq_chan_index)
 end
 
 %% Train a classifier
-train_set = X(cue_type_labels == code.cue_BH |cue_type_labels == code.cue_BF);
+train_set = X(cue_type_labels == code.cue_BH |cue_type_labels == code.cue_BF, :);
 label_set = cue_type_labels(cue_type_labels == code.cue_BH | cue_type_labels == code.cue_BF);
 
 classifier = train_binary_model(train_set, label_set); %probably SVM
 
 %% ONLINE BITCHEEEEEESSSS
 %load online file
-load(strcat(data_path, 'ah7.20170613.170929.online.mi.mi_bhbf.ema.gdf.mat'));
+[signal, header] = sload(strcat(data_path, 'ai6.20180316.161026.online.mi.mi_bhbf.dynamic.gdf'));
 % now data contains the online signal
 
 %% EEG to PSD
-
-signal = data.s;
-header = data.h;
-
 psd_signal = psd_extraction(signal, header);
 
 %% log and sub-frequences extraction
@@ -92,7 +89,7 @@ num_trials = max(trial_labels);
 %% Features extraction
 X_test_orig = extractFeatures(psd_signal.PSD, selected_freq_chan_index); %all
 %don't consider resting periods for Single sample acc
-X_test = X_test_orig(cue_type_labels == code.cue_BH | cue_type_labels == code.cue_BF);
+X_test = X_test_orig(cue_type_labels == code.cue_BH | cue_type_labels == code.cue_BF, :);
 % [windows x features]
 
 %% Classification of online data
@@ -104,7 +101,7 @@ disp('Single Sample accuracy: ')
 disp(single_sample_acc)
 
 %reconsider resting periods for evidence accumulation
-X_test = X_test_orig(cue_type_labels == code.cue_BH | cue_type_labels == code.cue_BF | cue_type_labels==code.cue_rest);
+X_test = X_test_orig(cue_type_labels == code.cue_BH | cue_type_labels == code.cue_BF | cue_type_labels==code.cue_rest, :);
 [computed_labels, post_probabilities, ~] = predict(classifier, X_test);
 
 %It's a double job, but just for the sake of testing
@@ -114,9 +111,10 @@ X_test = X_test_orig(cue_type_labels == code.cue_BH | cue_type_labels == code.cu
 
 disp('[proc] + Evidence accumulation');
 initial_value = 0.5;
-alpha = 0.97;
+alpha = 0.9;
+beta = 0.7;
 %ipp = exponential_smoothing(post_probabilities, trial_labels, initial_value, alpha);
-ipp = dynamic_smoothing(post_probabilities, trial_labels, alpha);
+ipp = dynamic_smoothing(post_probabilities, trial_labels, alpha, beta);
 
 
 %% Plot accumulated evidence and raw probabilities
@@ -127,7 +125,7 @@ LbClasses     = {'both feet', 'rest', 'both hands'};
 ValueClasses  = [1 0.5 0];
 Threshold     = 0.7;
 
-SelTrial = 12;
+SelTrial = 10;
 
 GreyColor = [150 150 150]/255;
 LineColors = {'b', 'g', 'r'};

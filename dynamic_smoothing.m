@@ -1,4 +1,4 @@
-function [smoothed_post_prob] = dynamic_smoothing(post_probabilities, trial_labels, alpha)
+function [smoothed_post_prob] = dynamic_smoothing(post_probabilities, trial_labels, alpha, beta)
 %[smoothed_post_prob] = dynamic_smoothing(post_probabilities, trial_labels, alpha)
 %	Applies evidence accumulation with dynamic smoothing (for binary classification)
 %   Input arguments:
@@ -21,8 +21,6 @@ function [smoothed_post_prob] = dynamic_smoothing(post_probabilities, trial_labe
 %            
 %       Note: the function will only consider the first class' posterior
 %       probabilities, see the lessons' slides for details   
-    [free_support, free_force] = f_free(0.8);
-    [bmi_support, bmi_force] = f_bmi();
     trial_labels = trial_labels(trial_labels ~= 0); %just to be sure
     
     smoothed_post_prob = zeros(size(post_probabilities, 1), 1);
@@ -36,12 +34,12 @@ function [smoothed_post_prob] = dynamic_smoothing(post_probabilities, trial_labe
             continue
         end
   
-        smoothed_post_prob(sample_offset+1,1) = curr_trial_post_prob(1,1);
+        smoothed_post_prob(sample_offset+1,1) = 0.5;
         
         for j = 2:size(curr_trial_post_prob)
-            delta = f_free_val(0.8, smoothed_post_prob(sample_offset+j-1,1));
-            delta = delta + f_bmi_val(curr_trial_post_prob(j,1));
-            smoothed_post_prob(sample_offset+j,1) = alpha*smoothed_post_prob(sample_offset+j-1,1) +(1-alpha)*delta;
+            delta = alpha * f_free_val(0.8, smoothed_post_prob(sample_offset+j-1,1));
+            delta = delta + (1-alpha)*f_bmi_val(curr_trial_post_prob(j,1));
+            smoothed_post_prob(sample_offset+j,1) = max(min(smoothed_post_prob(sample_offset+j-1,1) +beta*delta, 1),0);
         end
         
         sample_offset = sample_offset + j;
@@ -50,48 +48,20 @@ function [smoothed_post_prob] = dynamic_smoothing(post_probabilities, trial_labe
 end
 
 function [y] = f_free_val(conservative_amp, x)
-    if x <= 0.3
-        y = -sin((pi./0.3)*x);
-    end
-    
-    if x >= 0.7
-        y = sin((pi./0.3)*x);
-    end
-    
-    if (x > 0.3 && x < 0.7)
-        y = conservative_amp * sin((1./0.2)*pi*(x-0.3));
+
+    if (x <= 0.3)
+        y = -sin(pi*x/0.3);
+    else
+        if (x >= 0.7)
+            y = sin(pi*(x-0.7)/0.3);
+        else
+            y = conservative_amp * sin((1./0.2)*pi*(x-0.3));
+        end
     end
         
 end
 
 function [y] = f_bmi_val(x)
-    y = (asin(x)./asin(1)).*(0.5 .* (1-cos(pi.*x)));
-end
-
-function [support, value] = f_free(conservative_amp)
-%   Produces the free force of dynamic system smoothing (see report for details)
-%   Input arguments:
-%       -conservative_amp: amplitude of the sinusoid in [0.3, 0.7]
-%
-%   Output parameters:
-%       -support: vector of the support values of the curve [0, 1] with
-%        4-th decimal precision
-%       -value: contains the curve itself
-    t_1 = 0:0.0001:0.3;
-    t_2 = 0.3001:0.0001:0.7;
-    t_3 = 0.7001:0.0001:1;
-    
-    support = [t_1, t_2, t_3];
-    value = [-sin((pi./0.3).*t_1), conservative_amp.*sin((1./0.2)*pi.*(t_2-0.3)), sin((pi./0.3).*t_1(2:end))];
-end
-
-function [support, value] = f_bmi()
-%   Produces the BMI force of dynamic system smoothing (see report for details)
-%   Output parameters:
-%       -support: vector of the support values of the curve [0, 1] with
-%        4-th decimal precision
-%       -value: contains the curve itself
-    x = -1:.0001:1;
-    value = (asin(x(1:2:end))./asin(1)).*(0.5 .* (1-cos(pi.*x(1:2:end))));
-    support = 0:0.0001:1;
+    %y = (asin(2*x +0.5)./asin(1));
+    y = (asin(2*(x -0.5))./asin(1)).*(0.5*(1+cos(2*pi*x)));
 end
