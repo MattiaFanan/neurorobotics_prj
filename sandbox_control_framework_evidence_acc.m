@@ -85,23 +85,9 @@ original_frequences = psd_signal.frequences;
 %% Labeling (online) data
 num_windows = size(psd_signal.PSD, 1);
 [cue_type_labels, trial_labels] = labelData(psd_signal.EVENT, num_windows);
-
-trials = zeros(size(cue_type_labels,1), 1);
-k=1;
-for i = 2:length(cue_type_labels)
-    if (cue_type_labels(i,1) ~= 0)
-        trials(i,1) = k;
-    end
-    
-    if (cue_type_labels(i,1) == 0 && cue_type_labels(i-1,1) ~= 0)
-        k = k+1;
-    end
-        
-end
+trial_labels = trial_labels(trial_labels  ~= 0); % 11...11 22...22 ...
 cue_type_labels = cue_type_labels(cue_type_labels ~=0);
-trials = trials(trials ~= 0);
-% 11...11 22...22 ...
-num_trials = max(trials);
+num_trials = max(trial_labels);
 
 %% Features extraction
 X_test_orig = extractFeatures(psd_signal.PSD, selected_freq_chan_index); %all
@@ -110,7 +96,7 @@ X_test = X_test_orig(cue_type_labels == code.cue_BH | cue_type_labels == code.cu
 % [windows x features]
 
 %% Classification of online data
-[computed_labels, post_probabilities, ~] = predict(classifier, X_test);
+[computed_labels, ~, ~] = predict(classifier, X_test);
 
 single_sample_acc = 100*sum(computed_labels == cue_type_labels(cue_type_labels == code.cue_BH | cue_type_labels == code.cue_BF))./length(computed_labels);
 
@@ -126,24 +112,12 @@ X_test = X_test_orig(cue_type_labels == code.cue_BH | cue_type_labels == code.cu
 %% Evidence accumulation
 %Applying exponential smoothing
 
-disp('[proc] + Evidence accumulation (exponential smoothing)');
-
-num_samples = size(post_probabilities, 1);
-
-ipp = 0.5*ones(size(post_probabilities, 1), 1);
+disp('[proc] + Evidence accumulation');
+initial_value = 0.5;
 alpha = 0.97;
-sample_offset = 0;
+%ipp = exponential_smoothing(post_probabilities, trial_labels, initial_value, alpha);
+ipp = dynamic_smoothing(post_probabilities, trial_labels, alpha);
 
-
-for trial_n = 1:num_trials
-    curr_trial_post_prob = post_probabilities(trials == trial_n, :);
-    curr_trial_computed_labels = computed_labels(trials == trial_n);
-    for j = 2:size(curr_trial_post_prob)
-        ipp(sample_offset+j,1) = ipp(sample_offset+j-1,1).*alpha + curr_trial_post_prob(j, 1).*(1-alpha);
-    end
-    sample_offset = sample_offset + j;
-    
-end
 
 %% Plot accumulated evidence and raw probabilities
 fig1 = figure;
@@ -153,13 +127,13 @@ LbClasses     = {'both feet', 'rest', 'both hands'};
 ValueClasses  = [1 0.5 0];
 Threshold     = 0.7;
 
-SelTrial = 1;
+SelTrial = 12;
 
 GreyColor = [150 150 150]/255;
 LineColors = {'b', 'g', 'r'};
 
 hold on;
-trial_indices = trials==SelTrial;
+trial_indices = trial_labels==SelTrial;
 % Plotting raw probabilities
 plot(post_probabilities(trial_indices, 1), 'o', 'Color', GreyColor);
 
@@ -167,7 +141,7 @@ plot(post_probabilities(trial_indices, 1), 'o', 'Color', GreyColor);
 plot(ipp(trial_indices), 'k', 'LineWidth', 2);
 
 % Plotting actual target class
-class = CueClasses == (cue_type_labels(find(trials == SelTrial, 1, 'first')));
+class = CueClasses == (cue_type_labels(find(trial_labels == SelTrial, 1, 'first')));
 yline(ValueClasses(class), LineColors{class}, 'LineWidth', 5);
 
 % Plotting 0.5 line
@@ -189,24 +163,7 @@ title(['Trial ' num2str(SelTrial) '/' num2str(num_trials) ' - Class ' LbClasses{
 
 %% Compute performances
 ActualClass = psd_signal.EVENT.TYP(psd_signal.EVENT.TYP == code.cue_BF | psd_signal.EVENT.TYP == code.cue_BH | psd_signal.EVENT.TYP == code.cue_rest);
-Decision = nan(num_trials, 1);
-
-for trId = 1:num_trials
-    curr_ipp = ipp(trials==trId);
-    
-    endpoint = find( (curr_ipp >= Threshold) | (curr_ipp <= 1 - Threshold), 1, 'last' );
-    
-    if(isempty(endpoint))
-        Decision(trId) = 783;
-        continue;
-    end
-    
-    if(curr_ipp(endpoint) >= Threshold)
-        Decision(trId) = 771;
-    elseif (curr_ipp(endpoint) <= Threshold)
-        Decision(trId) = 773;
-    end
-end
+Decision = decide_on_evidence(ipp, trial_labels, Threshold, 'last', [code.cue_BF, code.cue_BH, code.cue_rest]);
 
 % Removing Rest trials
 ActiveTrials = (ActualClass ~= code.cue_rest);
