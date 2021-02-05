@@ -113,8 +113,8 @@ disp('[proc] + Evidence accumulation');
 initial_value = 0.5;
 alpha = 0.9;
 beta = 0.7;
-%ipp = exponential_smoothing(post_probabilities, trial_labels, initial_value, alpha);
-ipp = dynamic_smoothing(post_probabilities, trial_labels, alpha, beta);
+ipp = exponential_smoothing(post_probabilities, trial_labels, initial_value, alpha);
+%ipp = dynamic_smoothing(post_probabilities, trial_labels, alpha, beta);
 
 
 %% Plot accumulated evidence and raw probabilities

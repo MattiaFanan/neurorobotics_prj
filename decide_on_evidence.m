@@ -23,7 +23,7 @@ function [decisions] = decide_on_evidence(ipp, trial_labels, threshold, trespass
     undecided_class = classes_labels(1,3);
     class_1 = classes_labels(1,1);
     class_2 = classes_labels(1,2);
-    num_trials = max(trial_labels);
+    num_trials = max(trial_labels)-min(trial_labels)+1;
     decisions = nan(num_trials, 1);
     for trId = 1:num_trials
         curr_ipp = ipp(trial_labels==trId);

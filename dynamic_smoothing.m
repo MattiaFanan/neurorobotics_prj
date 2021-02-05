@@ -27,7 +27,7 @@ function [smoothed_post_prob] = dynamic_smoothing(post_probabilities, trial_labe
     sample_offset = 0;
     
     num_trials = max(trial_labels);
-        for trial_n = 1:num_trials
+        for trial_n = min(trial_labels):num_trials
         curr_trial_post_prob = post_probabilities(trial_labels == trial_n, :);
         
         if(isempty(curr_trial_post_prob))

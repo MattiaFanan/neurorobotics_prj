@@ -27,7 +27,7 @@ function [smoothed_post_prob] = exponential_smoothing(post_probabilities, trial_
     smoothed_post_prob = inial_value*ones(size(post_probabilities, 1), 1);
     sample_offset = 0;
     num_trials = max(trial_labels);
-    for trial_n = 1:num_trials
+    for trial_n = min(trial_labels):num_trials
         curr_trial_post_prob = post_probabilities(trial_labels == trial_n, :);
         for j = 2:size(curr_trial_post_prob)
             smoothed_post_prob(sample_offset+j,1) = smoothed_post_prob(sample_offset+j-1,1).*alpha + curr_trial_post_prob(j, 1).*(1-alpha);

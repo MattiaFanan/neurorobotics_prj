@@ -5,7 +5,7 @@ function [cue_type_labels, trial_labels] = labelData(EVENT,num_windows)
 %
 % Input arguments:
 %   - EVENT                 structure with the following fields
-%   (POS,TYP,DUR,FIN)for each event in the PSD
+%   (POS,TYP,DUR)for each event in the PSD
 %
 % Output arguments:
 %   - cue_type_labels       labelling vector for the type of event the
